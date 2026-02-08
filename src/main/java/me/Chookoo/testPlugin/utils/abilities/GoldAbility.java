@@ -31,13 +31,15 @@ public class GoldAbility implements CommandExecutor, Listener {
 
     private final JavaPlugin plugin;
     private final CooldownManager cooldownManager;
+    private static final int COOLDOWN_TIME = 10;
+
     private final Random random = new Random();
 
-    // ===== Weighted chances for each symbol (higher = more likely) =====
+    //
     private final Map<SlotSymbol, Integer> symbolWeights = Map.of(
-            SlotSymbol.POWER, 25,
-            SlotSymbol.GOLD, 25,
-            SlotSymbol.CURSE, 40,
+            SlotSymbol.POWER, 35,
+            SlotSymbol.GOLD, 35,
+            SlotSymbol.CURSE, 20,
             SlotSymbol.JACKPOT, 10
     );
 
@@ -84,12 +86,18 @@ public class GoldAbility implements CommandExecutor, Listener {
             return true;
         }
 
-        if (!cooldownManager.tryUseAbilityCooldownOnly(player, 10, 30, "gold")) return true;
+        // cd
+        if (!cooldownManager.tryUseAbility(player, COOLDOWN_TIME, COOLDOWN_TIME, COOLDOWN_TIME, "gold")) {
+            int remaining = cooldownManager.getPlayerCooldown(player.getUniqueId(), "gold");
+            player.sendActionBar(Component.text("⏳ Gold Ability cooldown: " + remaining + "s", NamedTextColor.RED));
+            return true;
+        }
 
         // Start action-bar cooldown indicator
         int remaining = cooldownManager.getPlayerCooldown(player.getUniqueId(), "gold");
         startCooldownIndicator(player, remaining, "Gold Ability");
 
+        // Run slot machine as normal
         SlotSymbol finalSymbol = randomSymbol();
         openSlotMachine(player, finalSymbol);
         return true;
@@ -138,7 +146,12 @@ public class GoldAbility implements CommandExecutor, Listener {
 
     private void applyEffect(Player player, SlotSymbol symbol) {
         switch (symbol) {
-            case POWER -> player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 20 * 13, 2));
+            case POWER -> {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 20 * 13, 2));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 20*5, 2));
+
+                player.getWorld().playSound(player.getLocation(), Sound.BLOCK_BREWING_STAND_BREW, 1f, 1.2f);
+            }
             case GOLD -> {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 20 * 10, 1));
                 player.giveExp(80);

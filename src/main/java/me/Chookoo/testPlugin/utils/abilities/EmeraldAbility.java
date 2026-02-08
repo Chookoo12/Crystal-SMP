@@ -23,6 +23,7 @@ public class EmeraldAbility implements CommandExecutor {
     private final CooldownManager cooldownManager;
     private final int cooldownTime = 20;
 
+
     public EmeraldAbility(JavaPlugin plugin, CooldownManager cooldownManager) {
         this.plugin = plugin;
         this.cooldownManager = cooldownManager;
@@ -46,13 +47,13 @@ public class EmeraldAbility implements CommandExecutor {
         player.playSound(player.getLocation(), Sound.ENTITY_EVOKER_CAST_SPELL, 1.6f, 1f);
 
         // ---- Adjustable Parameters ----
-        double stepDistance = 1.2;
-        double totalDistance = 15;
+        double stepDistance = 1.5;
+        double totalDistance = 5;
         double spreadWidth = 3;     // total horizontal width
-        int fangsPerRow = 5;
-        int totalRows = 3;            // horizontal rows
+        int fangsPerRow = 4;
+        int totalRows = 4;            // horizontal rows
         double rowSpacing = 1.0;
-        double trueDamage = 2.5;
+        double trueDamage = 0.3;
         long fangLifetime = 25L;
         // --------------------------------
 
@@ -131,13 +132,20 @@ public class EmeraldAbility implements CommandExecutor {
             if (target.equals(caster)) return;
             if (!hit.add(target)) return;
 
+
+            target.damage(0.1);
             target.setHealth(Math.max(0, target.getHealth() - damage));
+
+            if (target instanceof Player hitPlayer) {
+                float current = hitPlayer.getSaturation();
+                hitPlayer.setSaturation(Math.max(0f, current - 0.35f));
+            }
 
             Vector kb = target.getLocation().toVector()
                     .subtract(caster.getLocation().toVector())
                     .normalize()
-                    .multiply(0.8);
-            kb.setY(0.35);
+                    .multiply(0.4);
+            kb.setY(0.2);
             target.setVelocity(kb);
         });
 
