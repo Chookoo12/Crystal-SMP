@@ -16,6 +16,7 @@ public class AbilityCommandExecutor implements CommandExecutor {
     private final IronAbility ironAbility;
     private final RedstoneAbility redstoneAbility;
     private final LapisAbility lapisAbility;
+    private  final EmeraldAbility emeraldAbility;
 
     public AbilityCommandExecutor(JavaPlugin plugin, CooldownManager cooldownManager) {
         this.copperAbility = new CopperAbility(plugin, cooldownManager);
@@ -23,6 +24,7 @@ public class AbilityCommandExecutor implements CommandExecutor {
         this.ironAbility = new IronAbility(plugin, cooldownManager);
         this.redstoneAbility = new RedstoneAbility(plugin, cooldownManager);
         this.lapisAbility = new LapisAbility(plugin, cooldownManager);
+        this.emeraldAbility = new EmeraldAbility(plugin, cooldownManager);
 
         plugin.getServer().getPluginManager().registerEvents(ironAbility, plugin);
     }
@@ -35,7 +37,7 @@ public class AbilityCommandExecutor implements CommandExecutor {
         }
 
         if (args.length < 2) {
-            player.sendMessage(Component.text("Usage: /ability <copper|gold|iron|redstone> <level>", NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("Usage: /ability <copper|gold|iron|redstone|emerald> <level>", NamedTextColor.YELLOW));
             return true;
         }
 
@@ -47,8 +49,9 @@ public class AbilityCommandExecutor implements CommandExecutor {
             case "iron" -> ironAbility.activate(player);
             case "redstone" -> redstoneAbility.onCommand(sender, command, label, args);
             case "lapis" -> lapisAbility.onCommand(sender,command, label, args);
+            case "emerald" -> emeraldAbility.onCommand(sender, command, label, args);
             default -> player.sendMessage(
-                    Component.text("Unknown ability. Use: copper, gold, iron, or redstone.", NamedTextColor.RED)
+                    Component.text("Unknown ability. Use: copper, gold, iron, emerald, or redstone.", NamedTextColor.RED)
             );
         }
 

@@ -11,6 +11,8 @@ import org.bukkit.entity.Damageable;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
@@ -51,26 +53,29 @@ public class LapisAbility implements CommandExecutor {
         player.playSound(player.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 3f, 1f);
 
         player.addPotionEffect(new org.bukkit.potion.PotionEffect(
-                org.bukkit.potion.PotionEffectType.SLOWNESS,
-                60,
-                10,
-                false,
-                false,
-                false
-        ));
+                org.bukkit.potion.PotionEffectType.SLOWNESS, 60, 10, false, false, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 60, 1, false, false, false));
 
+
+
+        // Charge phase with dust spiral AND AoE outline
         new BukkitRunnable() {
             int ticks = 0;
+            final int durationTicks = 40;
+            final double effectRadius = 5; // radius of AoE outline
 
             @Override
             public void run() {
-                if (ticks >= 40) {
+                if (ticks >= durationTicks) {
                     cancel();
                     return;
                 }
 
-                double radius = 1.0 + ticks * 0.05;
+                // Spawn the circular outline
+                spawnLapisOutline(player.getLocation(), effectRadius);
 
+                // Spiral dust effect
+                double radius = 1.0 + ticks * 0.05;
                 for (int i = 0; i < 50; i++) {
                     double angle = 2 * Math.PI * i / 50;
                     double x = Math.cos(angle) * radius;
@@ -83,9 +88,11 @@ public class LapisAbility implements CommandExecutor {
                             new Particle.DustOptions(Color.BLUE, 1f)
                     );
                 }
+
                 ticks++;
             }
         }.runTaskTimer(plugin, 0L, 1L);
+
 
         for (int i = 0; i < 3; i++) {
             int index = i;
@@ -164,16 +171,14 @@ public class LapisAbility implements CommandExecutor {
 
                         hitEntities.add(target);
 
-
-                        //kb
+                        // kb
                         Vector knockback = target.getLocation().toVector()
                                 .subtract(shooter.getLocation().toVector())
                                 .normalize()
-                                .multiply(0.7);   // horizontal strength (Punch I ~0.7, Punch II ~1.1)
+                                .multiply(1);   // horizontal strength
 
                         knockback.setY(0.35); // vertical lift
                         target.setVelocity(knockback);
-
 
                         Location hitLoc = target.getLocation().add(0, 1, 0);
 
@@ -232,5 +237,22 @@ public class LapisAbility implements CommandExecutor {
                 remaining--;
             }
         }.runTaskTimer(plugin, 0L, 20L);
+    }
+
+    // --- New method for AoE outline ---
+    private void spawnLapisOutline(Location center, double radius) {
+        int points = 50;
+        for (int i = 0; i < points; i++) {
+            double angle = 2 * Math.PI * i / points;
+            double x = Math.cos(angle) * radius;
+            double z = Math.sin(angle) * radius;
+
+            center.getWorld().spawnParticle(
+                    Particle.ENCHANT,
+                    center.clone().add(x, 0.1, z),
+                    5,
+                    0, 0, 0, 0
+            );
+        }
     }
 }

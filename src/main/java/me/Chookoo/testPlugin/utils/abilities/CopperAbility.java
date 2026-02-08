@@ -69,6 +69,7 @@ public class CopperAbility implements CommandExecutor {
             if (copperHelmet) {
                 player.getWorld().strikeLightning(player.getLocation());
                 player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 20 * 6, 1));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 20 * 6, 1));
                 player.sendMessage(Component.text("⚡ Copper power surges through you!", NamedTextColor.GOLD));
                 return true;
             }

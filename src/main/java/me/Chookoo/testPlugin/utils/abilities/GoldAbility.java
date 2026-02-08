@@ -99,7 +99,7 @@ public class GoldAbility implements CommandExecutor, Listener {
         Inventory inv = Bukkit.createInventory(null, 9, Component.text("🎰 Gilded Slots", NamedTextColor.GOLD));
         player.openInventory(inv);
 
-        player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, Integer.MAX_VALUE, 2, false, false, true));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 2, 3, false, false, true));
 
         new BukkitRunnable() {
             int ticks = 0;

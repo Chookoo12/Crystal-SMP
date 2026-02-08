@@ -138,14 +138,14 @@ public class RedstoneAbility implements CommandExecutor {
 
                                 target.setNoDamageTicks(0);
                                 target.damage(0.1);
-                                target.setHealth(Math.max(0, target.getHealth() - 2.5));
+                                target.setHealth(Math.max(0, target.getHealth() - 5));
 
-                                double kb = Math.max(0.3, 2.0 * (1 - distance / maxRadius));
+                                double kb = Math.max(1.3, 2.0 * (1 - distance / maxRadius));
                                 Vector push = target.getLocation().toVector()
                                         .subtract(player.getLocation().toVector())
                                         .normalize()
                                         .multiply(kb);
-                                push.setY(kb * 0.5);
+                                push.setY(kb * 1);
                                 target.setVelocity(push);
                             }
                         }
@@ -217,7 +217,7 @@ public class RedstoneAbility implements CommandExecutor {
 
                     target.setNoDamageTicks(0);
                     target.damage(0.1);
-                    target.setHealth(Math.max(0, target.getHealth() - 1.5));
+                    target.setHealth(Math.max(0, target.getHealth() - 2));
 
                     Vector push = target.getLocation().toVector()
                             .subtract(caster.getLocation().toVector())
