@@ -157,17 +157,15 @@ public class LapisAbility implements CommandExecutor {
 
                     if (target instanceof Damageable damageable) {
 
-                        // Tiny real damage for red flash + hurt animation
                         damageable.damage(0.1, shooter);
 
-                        // Custom true damage (ignores armor)
                         double trueDamage = 2.5;
                         damageable.setHealth(Math.max(0, damageable.getHealth() - trueDamage));
 
                         hitEntities.add(target);
 
 
-                        // ===== KNOCKBACK (NEW) =====
+                        //kb
                         Vector knockback = target.getLocation().toVector()
                                 .subtract(shooter.getLocation().toVector())
                                 .normalize()
@@ -175,7 +173,7 @@ public class LapisAbility implements CommandExecutor {
 
                         knockback.setY(0.35); // vertical lift
                         target.setVelocity(knockback);
-                        // ===========================
+
 
                         Location hitLoc = target.getLocation().add(0, 1, 0);
 

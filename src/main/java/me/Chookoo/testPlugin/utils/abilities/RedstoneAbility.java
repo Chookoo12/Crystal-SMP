@@ -3,6 +3,7 @@ package me.Chookoo.testPlugin.utils.abilities;
 import me.Chookoo.testPlugin.utils.CooldownManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Color;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.command.Command;
@@ -12,8 +13,6 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
@@ -44,18 +43,16 @@ public class RedstoneAbility implements CommandExecutor {
             return true;
         }
 
-        // --- NEW cooldown system ---
         if (!cooldownManager.tryUseAbilityCooldownOnly(player, cooldownTime, cooldownTime, "redstone")) return true;
 
-        // Show action-bar countdown for cooldown
         int remaining = cooldownManager.getPlayerCooldown(player.getUniqueId(), "redstone");
         startCooldownTimer(player, remaining);
 
-        // --- ORIGINAL ABILITY LOGIC START ---
         player.sendMessage(Component.text("🔴 Charging Redstone Overload...", NamedTextColor.RED));
-        player.playSound(player.getLocation(), Sound.BLOCK_TRIPWIRE_CLICK_ON, 0.8f, 1f);
+        player.playSound(player.getLocation(), Sound.BLOCK_TRIPWIRE_CLICK_ON, 1f, 1f);
 
-        BukkitRunnable chargingParticles = new BukkitRunnable() {
+        // --- Charging Particles ---
+        new BukkitRunnable() {
             int ticks = 0;
             final int durationTicks = 40;
 
@@ -72,15 +69,15 @@ public class RedstoneAbility implements CommandExecutor {
                     player.getWorld().spawnParticle(
                             Particle.DUST,
                             player.getLocation().add(x, 1, z),
-                            1,
-                            new Particle.DustOptions(org.bukkit.Color.RED, 1)
+                            2,
+                            new Particle.DustOptions(Color.RED, 1)
                     );
                 }
                 ticks++;
             }
-        };
-        chargingParticles.runTaskTimer(plugin, 0L, 1L);
+        }.runTaskTimer(plugin, 0L, 1L);
 
+        // --- Shockwave Explosion ---
         new BukkitRunnable() {
             @Override
             public void run() {
@@ -90,44 +87,47 @@ public class RedstoneAbility implements CommandExecutor {
                 new BukkitRunnable() {
                     double radius = 0.1;
                     final double maxRadius = 7;
-                    final double step = 0.5;
-                    Set<LivingEntity> hitEntities = new HashSet<>();
+                    final double step = 0.4;
+                    final Set<LivingEntity> hitEntities = new HashSet<>();
 
                     @Override
                     public void run() {
                         if (radius > maxRadius) {
                             cancel();
+                            startRedstoneTickDamage(player, maxRadius, 3); // seconds of Tick damage
                             return;
                         }
+
                         for (Entity entity : player.getNearbyEntities(maxRadius, maxRadius, maxRadius)) {
-                            if (entity instanceof LivingEntity target &&
-                                    entity != player &&
-                                    !hitEntities.contains(target)) {
+                            if (!(entity instanceof LivingEntity target)) continue;
+                            if (target.equals(player)) continue;
+                            if (hitEntities.contains(target)) continue;
 
-                                double distance = entity.getLocation().distance(player.getLocation());
-                                if (distance <= radius && distance > radius - step) {
-                                    hitEntities.add(target);
+                            double distance = entity.getLocation().distance(player.getLocation());
+                            if (distance <= radius && distance > radius - step) {
+                                hitEntities.add(target);
 
-                                    target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 20 * 5, 4));
-                                    target.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 20 * 7, 2));
+                                // Flash red briefly
+                                target.setNoDamageTicks(0);
+                                target.damage(0.1);
 
-                                    if (target instanceof Player) {
-                                        target.addPotionEffect(new PotionEffect(PotionEffectType.POISON, 20 * 5, 1));
-                                    }
+                                // True damage
+                                double trueDamage = 2.5;
+                                target.setHealth(Math.max(0, target.getHealth() - trueDamage));
 
-                                    double knockbackMultiplier = 2.0 * (1 - distance / maxRadius);
-                                    if (knockbackMultiplier < 0.3) knockbackMultiplier = 0.3;
-
-                                    Vector push = target.getLocation().toVector()
-                                            .subtract(player.getLocation().toVector())
-                                            .normalize()
-                                            .multiply(knockbackMultiplier);
-                                    push.setY(knockbackMultiplier * 0.5);
-                                    target.setVelocity(push);
-                                }
+                                // Initial knockback
+                                double kbMultiplier = 2.0 * (1 - distance / maxRadius);
+                                if (kbMultiplier < 0.3) kbMultiplier = 0.3;
+                                Vector push = target.getLocation().toVector()
+                                        .subtract(player.getLocation().toVector())
+                                        .normalize()
+                                        .multiply(kbMultiplier);
+                                push.setY(kbMultiplier * 0.5);
+                                target.setVelocity(push);
                             }
                         }
 
+                        // Shockwave particles
                         for (int i = 0; i < 50; i++) {
                             double angle = 2 * Math.PI * i / 50;
                             double x = Math.cos(angle) * radius;
@@ -135,8 +135,8 @@ public class RedstoneAbility implements CommandExecutor {
                             player.getWorld().spawnParticle(
                                     Particle.DUST,
                                     player.getLocation().add(x, 1, z),
-                                    1,
-                                    new Particle.DustOptions(org.bukkit.Color.RED, 1)
+                                    4,
+                                    new Particle.DustOptions(Color.RED, 1)
                             );
                         }
 
@@ -146,16 +146,15 @@ public class RedstoneAbility implements CommandExecutor {
 
             }
         }.runTaskLater(plugin, 40L);
-        // --- ORIGINAL ABILITY LOGIC END ---
 
         return true;
     }
 
-    // --- NEW cooldown timer function ---
+    // --- Cooldown ActionBar ---
     private void startCooldownTimer(Player player, int cooldownSeconds) {
         new BukkitRunnable() {
             int ticksPassed = 0;
-            int totalTicks = cooldownSeconds * 20;
+            final int totalTicks = cooldownSeconds * 20;
             int remaining = cooldownSeconds;
 
             @Override
@@ -172,5 +171,43 @@ public class RedstoneAbility implements CommandExecutor {
                 }
             }
         }.runTaskTimer(plugin, 0L, 1L);
+    }
+
+    // tick damage
+    private void startRedstoneTickDamage(Player caster, double radius, int durationSeconds) {
+        final double trueDamagePerSecond = 1.5;
+
+        new BukkitRunnable() {
+            int seconds = 0;
+
+            @Override
+            public void run() {
+                if (seconds >= durationSeconds) {
+                    cancel();
+                    return;
+                }
+
+                for (Entity e : caster.getWorld().getNearbyEntities(caster.getLocation(), radius, radius, radius)) {
+                    if (!(e instanceof LivingEntity target)) continue;
+                    if (target.equals(caster)) continue;
+
+                    // damage
+                    target.setNoDamageTicks(0);
+                    target.damage(0.1);
+
+                    target.setHealth(Math.max(0, target.getHealth() - trueDamagePerSecond));
+
+                    // small kb
+                    Vector push = target.getLocation().toVector()
+                            .subtract(caster.getLocation().toVector())
+                            .normalize()
+                            .multiply(0.3); // adjustable small push
+                    push.setY(0.1);
+                    target.setVelocity(target.getVelocity().add(push));
+                }
+
+                seconds++;
+            }
+        }.runTaskTimer(plugin, 0L, 15L); // every second
     }
 }
