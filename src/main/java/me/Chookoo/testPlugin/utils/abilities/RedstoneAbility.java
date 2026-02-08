@@ -3,7 +3,9 @@ package me.Chookoo.testPlugin.utils.abilities;
 import me.Chookoo.testPlugin.utils.CooldownManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.Color;
+import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.command.Command;
@@ -13,6 +15,8 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
@@ -43,7 +47,8 @@ public class RedstoneAbility implements CommandExecutor {
             return true;
         }
 
-        if (!cooldownManager.tryUseAbilityCooldownOnly(player, cooldownTime, cooldownTime, "redstone")) return true;
+        if (!cooldownManager.tryUseAbilityCooldownOnly(player, cooldownTime, cooldownTime, "redstone"))
+            return true;
 
         int remaining = cooldownManager.getPlayerCooldown(player.getUniqueId(), "redstone");
         startCooldownTimer(player, remaining);
@@ -51,7 +56,28 @@ public class RedstoneAbility implements CommandExecutor {
         player.sendMessage(Component.text("🔴 Charging Redstone Overload...", NamedTextColor.RED));
         player.playSound(player.getLocation(), Sound.BLOCK_TRIPWIRE_CLICK_ON, 1f, 1f);
 
-        // --- Charging Particles ---
+        // charge slowness
+        player.addPotionEffect(new PotionEffect(
+                PotionEffectType.SLOWNESS,
+                40, // 2 seconds (matches charge)
+                1,  // amplifier don't do an Alfi
+                false,
+                false
+        ));
+
+        if (Bukkit.getPluginManager().isPluginEnabled("PlayerParticles")) {
+            Bukkit.dispatchCommand(
+                    Bukkit.getConsoleSender(),
+                    "ppo " + player.getName() +
+                            " add dust_color_transition spiral red red"
+            );
+        }
+
+
+
+
+
+        // charging
         new BukkitRunnable() {
             int ticks = 0;
             final int durationTicks = 40;
@@ -60,27 +86,29 @@ public class RedstoneAbility implements CommandExecutor {
             public void run() {
                 if (ticks >= durationTicks) {
                     cancel();
+
+                    // Remove slowness
+                    player.removePotionEffect(PotionEffectType.SLOWNESS);
+
+                    if (Bukkit.getPluginManager().isPluginEnabled("PlayerParticles")) {
+                        Bukkit.dispatchCommand(
+                                Bukkit.getConsoleSender(),
+                                "ppo " + player.getName() + " reset"
+                        );
+                    }
+
                     return;
                 }
-                for (int i = 0; i < 50; i++) {
-                    double angle = 2 * Math.PI * i / 50;
-                    double x = Math.cos(angle) * 1.2;
-                    double z = Math.sin(angle) * 1.2;
-                    player.getWorld().spawnParticle(
-                            Particle.DUST,
-                            player.getLocation().add(x, 1, z),
-                            2,
-                            new Particle.DustOptions(Color.RED, 1)
-                    );
-                }
+
                 ticks++;
             }
         }.runTaskTimer(plugin, 0L, 1L);
 
-        // --- Shockwave Explosion ---
+        // shockwave
         new BukkitRunnable() {
             @Override
             public void run() {
+
                 player.getWorld().spawnParticle(Particle.EXPLOSION, player.getLocation(), 10);
                 player.getWorld().playSound(player.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 1f, 1f);
 
@@ -94,7 +122,8 @@ public class RedstoneAbility implements CommandExecutor {
                     public void run() {
                         if (radius > maxRadius) {
                             cancel();
-                            startRedstoneTickDamage(player, maxRadius, 3); // seconds of Tick damage
+                            startRedstoneTickDamage(player, maxRadius, 3);
+                            spawnGroundParticles(player.getLocation(), maxRadius, 3);
                             return;
                         }
 
@@ -107,31 +136,25 @@ public class RedstoneAbility implements CommandExecutor {
                             if (distance <= radius && distance > radius - step) {
                                 hitEntities.add(target);
 
-                                // Flash red briefly
                                 target.setNoDamageTicks(0);
                                 target.damage(0.1);
+                                target.setHealth(Math.max(0, target.getHealth() - 2.5));
 
-                                // True damage
-                                double trueDamage = 2.5;
-                                target.setHealth(Math.max(0, target.getHealth() - trueDamage));
-
-                                // Initial knockback
-                                double kbMultiplier = 2.0 * (1 - distance / maxRadius);
-                                if (kbMultiplier < 0.3) kbMultiplier = 0.3;
+                                double kb = Math.max(0.3, 2.0 * (1 - distance / maxRadius));
                                 Vector push = target.getLocation().toVector()
                                         .subtract(player.getLocation().toVector())
                                         .normalize()
-                                        .multiply(kbMultiplier);
-                                push.setY(kbMultiplier * 0.5);
+                                        .multiply(kb);
+                                push.setY(kb * 0.5);
                                 target.setVelocity(push);
                             }
                         }
 
-                        // Shockwave particles
                         for (int i = 0; i < 50; i++) {
                             double angle = 2 * Math.PI * i / 50;
                             double x = Math.cos(angle) * radius;
                             double z = Math.sin(angle) * radius;
+
                             player.getWorld().spawnParticle(
                                     Particle.DUST,
                                     player.getLocation().add(x, 1, z),
@@ -143,40 +166,41 @@ public class RedstoneAbility implements CommandExecutor {
                         radius += step;
                     }
                 }.runTaskTimer(plugin, 0L, 2L);
-
             }
         }.runTaskLater(plugin, 40L);
 
         return true;
     }
 
-    // --- Cooldown ActionBar ---
+    // cd
     private void startCooldownTimer(Player player, int cooldownSeconds) {
         new BukkitRunnable() {
-            int ticksPassed = 0;
-            final int totalTicks = cooldownSeconds * 20;
+            int ticks = 0;
             int remaining = cooldownSeconds;
 
             @Override
             public void run() {
-                if (ticksPassed < totalTicks) {
-                    if (ticksPassed % 20 == 0) {
-                        player.sendActionBar(Component.text("⏱ Redstone Cooldown: " + remaining + "s", NamedTextColor.AQUA));
-                        remaining--;
-                    }
-                    ticksPassed++;
-                } else {
+                if (ticks >= cooldownSeconds * 20) {
                     player.sendActionBar(Component.text("✨ Redstone Ability ready!", NamedTextColor.GREEN));
                     cancel();
+                    return;
                 }
+
+                if (ticks % 20 == 0) {
+                    player.sendActionBar(Component.text(
+                            "⏱ Redstone Cooldown: " + remaining + "s",
+                            NamedTextColor.AQUA
+                    ));
+                    remaining--;
+                }
+
+                ticks++;
             }
         }.runTaskTimer(plugin, 0L, 1L);
     }
 
     // tick damage
     private void startRedstoneTickDamage(Player caster, double radius, int durationSeconds) {
-        final double trueDamagePerSecond = 1.5;
-
         new BukkitRunnable() {
             int seconds = 0;
 
@@ -191,23 +215,52 @@ public class RedstoneAbility implements CommandExecutor {
                     if (!(e instanceof LivingEntity target)) continue;
                     if (target.equals(caster)) continue;
 
-                    // damage
                     target.setNoDamageTicks(0);
                     target.damage(0.1);
+                    target.setHealth(Math.max(0, target.getHealth() - 1.5));
 
-                    target.setHealth(Math.max(0, target.getHealth() - trueDamagePerSecond));
-
-                    // small kb
                     Vector push = target.getLocation().toVector()
                             .subtract(caster.getLocation().toVector())
                             .normalize()
-                            .multiply(0.3); // adjustable small push
+                            .multiply(0.3);
                     push.setY(0.1);
                     target.setVelocity(target.getVelocity().add(push));
                 }
 
                 seconds++;
             }
-        }.runTaskTimer(plugin, 0L, 15L); // every second
+        }.runTaskTimer(plugin, 0L, 20L);
+    }
+
+    private void spawnGroundParticles(Location center, double radius, int durationSeconds) {
+        new BukkitRunnable() {
+            int seconds = 0;
+
+            @Override
+            public void run() {
+                if (seconds >= durationSeconds) {
+                    cancel();
+                    return;
+                }
+
+                for (int i = 0; i < 100; i++) {
+                    double angle = Math.random() * Math.PI * 2;
+                    double r = Math.random() * radius;
+                    double x = Math.cos(angle) * r;
+                    double z = Math.sin(angle) * r;
+
+                    center.getWorld().spawnParticle(
+                            Particle.DUST_COLOR_TRANSITION,
+                            center.clone().add(x, 0.25, z),
+                            700,
+                            0, 0, 0,
+                            0,
+                            new Particle.DustOptions(Color.RED, 1.2f)
+                    );
+                }
+
+                seconds++;
+            }
+        }.runTaskTimer(plugin, 0L, 20L);
     }
 }
