@@ -17,6 +17,7 @@ public class AbilityCommandExecutor implements CommandExecutor {
     private final RedstoneAbility redstoneAbility;
     private final LapisAbility lapisAbility;
     private  final EmeraldAbility emeraldAbility;
+    private final AmethystAbility amethystAbility;
 
     public AbilityCommandExecutor(JavaPlugin plugin, CooldownManager cooldownManager) {
         this.copperAbility = new CopperAbility(plugin, cooldownManager);
@@ -25,6 +26,7 @@ public class AbilityCommandExecutor implements CommandExecutor {
         this.redstoneAbility = new RedstoneAbility(plugin, cooldownManager);
         this.lapisAbility = new LapisAbility(plugin, cooldownManager);
         this.emeraldAbility = new EmeraldAbility(plugin, cooldownManager);
+        this.amethystAbility = new AmethystAbility(plugin, cooldownManager);
 
         plugin.getServer().getPluginManager().registerEvents(ironAbility, plugin);
     }
@@ -50,6 +52,8 @@ public class AbilityCommandExecutor implements CommandExecutor {
             case "redstone" -> redstoneAbility.onCommand(sender, command, label, args);
             case "lapis" -> lapisAbility.onCommand(sender,command, label, args);
             case "emerald" -> emeraldAbility.onCommand(sender, command, label, args);
+            case "amethyst" -> amethystAbility.onCommand(sender, command, label, args);
+
             default -> player.sendMessage(
                     Component.text("Unknown ability. Use: copper, gold, iron, emerald, or redstone.", NamedTextColor.RED)
             );

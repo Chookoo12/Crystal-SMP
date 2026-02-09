@@ -58,11 +58,11 @@ public class LapisAbility implements CommandExecutor {
 
 
 
-        // Charge phase with dust spiral AND AoE outline
+        // charge
         new BukkitRunnable() {
             int ticks = 0;
             final int durationTicks = 40;
-            final double effectRadius = 5; // radius of AoE outline
+            final double effectRadius = 5;
 
             @Override
             public void run() {
