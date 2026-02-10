@@ -5,21 +5,20 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
-import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Player;
+import org.bukkit.command.*;
+import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
+import org.bukkit.potion.*;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.Transformation;
 import org.bukkit.util.Vector;
+import org.joml.AxisAngle4f;
+import org.joml.Vector3f;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -30,18 +29,24 @@ public class AmethystAbility implements CommandExecutor, Listener {
     private final JavaPlugin plugin;
     private final CooldownManager cooldownManager;
 
-    // ---------- Adjustable Parameters ----------
+    // Adjustable parameters
     private final int cooldownSeconds = 20;
     private final int chargeSeconds = 2;
-    private final double storedDamagePercent = 0.45;
+    private final double storedDamagePercent = 0.60;
     private final double damageMultiplier = 1.0;
     private final double blastRadius = 3.5;
     private final double maxBlastDamage = 14.0;
     private final double knockbackReduction = 0.35;
-    // -------------------------------------------
 
+    // Bubble config
+    private static final float BUBBLE_SIZE = 1.75f;
+    private static final float BUBBLE_ROTATION_DEGREES = 45f;
+
+    // State
     private final Map<UUID, Double> storedDamage = new HashMap<>();
     private final Map<UUID, Long> chargingPlayers = new HashMap<>();
+    private final Map<UUID, Display> amethystBubbles = new HashMap<>();
+    private final Map<UUID, BukkitRunnable> bubbleTasks = new HashMap<>();
 
     public AmethystAbility(JavaPlugin plugin, CooldownManager cooldownManager) {
         this.plugin = plugin;
@@ -67,8 +72,8 @@ public class AmethystAbility implements CommandExecutor, Listener {
 
         player.addPotionEffect(new PotionEffect(
                 PotionEffectType.SLOWNESS,
-                chargeSeconds * 40,
-                9999,
+                chargeSeconds * 20,
+                255,
                 false,
                 false,
                 true
@@ -76,9 +81,9 @@ public class AmethystAbility implements CommandExecutor, Listener {
 
         player.sendMessage(Component.text("💜 Amethyst Shell activated!", NamedTextColor.LIGHT_PURPLE));
         player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_RESONATE, 1.5f, 0.8f);
-
         runParticlesCommand("ppo " + player.getName() + " add dust_color_transition cube purple purple");
 
+        spawnAmethystBubble(player);
         startCooldownTimer(player, cooldownSeconds);
 
         new BukkitRunnable() {
@@ -95,120 +100,155 @@ public class AmethystAbility implements CommandExecutor, Listener {
     @EventHandler
     public void onDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
+        if (!chargingPlayers.containsKey(player.getUniqueId())) return;
 
-        UUID id = player.getUniqueId();
-        if (!chargingPlayers.containsKey(id)) return;
+        double stored = event.getFinalDamage() * storedDamagePercent;
+        storedDamage.put(player.getUniqueId(),
+                storedDamage.get(player.getUniqueId()) + stored);
 
-        double rawDamage = event.getFinalDamage();
-        double stored = rawDamage * storedDamagePercent;
-        storedDamage.put(id, storedDamage.get(id) + stored);
-
-        // reduce kb
         player.setVelocity(player.getVelocity().multiply(knockbackReduction));
+    }
 
-        player.getWorld().spawnParticle(
-                Particle.DUST,
-                player.getLocation().add(0, 1, 0),
-                6,
-                0.4,
-                0.6,
-                0.4,
-                new Particle.DustOptions(Color.fromRGB(190, 120, 255), 1.3f)
+    // item display
+    private void spawnAmethystBubble(Player player) {
+
+        Vector center = player.getBoundingBox().getCenter();
+
+        Location loc = new Location(
+                player.getWorld(),
+                center.getX(),
+                center.getY(),
+                center.getZ(),
+                0f,
+                0f
         );
+
+        ItemDisplay display = player.getWorld().spawn(loc, ItemDisplay.class);
+
+        // ⚠️ USE NON-CUBE TO SEE ROTATION
+        ItemStack item = new ItemStack(Material.PURPLE_STAINED_GLASS);
+        display.setItemStack(item);
+
+        // 🔥 REQUIRED FOR ROTATION TO APPLY CORRECTLY
+        display.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
+        display.setBillboard(Display.Billboard.FIXED);
+
+        display.setInterpolationDuration(0);
+        display.setInterpolationDelay(0);
+        display.setTeleportDuration(0);
+        display.setShadowRadius(0f);
+        display.setShadowStrength(0f);
+
+        float scale = 3.5f;
+
+        display.setTransformation(new Transformation(
+                new Vector3f(0f, 0f, 0f),
+                new AxisAngle4f(
+                        (float) Math.toRadians(45),
+                        1f, 1f, 1f
+                ),
+                new Vector3f(scale, scale, scale),
+                new AxisAngle4f()
+        ));
+
+        amethystBubbles.put(player.getUniqueId(), display);
+
+        BukkitRunnable follow = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!player.isOnline() || !chargingPlayers.containsKey(player.getUniqueId())) {
+                    cancel();
+                    return;
+                }
+
+                Vector c = player.getBoundingBox().getCenter();
+                display.teleport(new Location(
+                        player.getWorld(),
+                        c.getX(),
+                        c.getY(),
+                        c.getZ(),
+                        0f,
+                        0f
+                ));
+            }
+        };
+
+        follow.runTaskTimer(plugin, 0L, 1L);
+        bubbleTasks.put(player.getUniqueId(), follow);
     }
 
-    // anti jump
-    @EventHandler
-    public void onPlayerMove(PlayerMoveEvent event) {
-        Player player = event.getPlayer();
+    private void shatterBubble(Player player) {
         UUID id = player.getUniqueId();
+        Display display = amethystBubbles.remove(id);
+        BukkitRunnable follow = bubbleTasks.remove(id);
 
-        if (!chargingPlayers.containsKey(id)) return;
+        if (follow != null) follow.cancel();
+        if (display == null) return;
 
-        Location loc = player.getLocation();
-        // Get the block directly under the player
-        Block under = loc.getBlock().getRelative(BlockFace.DOWN);
+        Location loc = display.getLocation();
 
-        // If standing on air (fell slightly), teleport them back to the ground
-        if (under.getType().isAir()) return; // let them fall naturally if not on solid ground
+        loc.getWorld().spawnParticle(
+                Particle.BLOCK_CRUMBLE,
+                loc,
+                20,
+                0.6, 0.8, 0.6,
+                Material.PURPLE_STAINED_GLASS.createBlockData()
+        );
 
-        double groundY = under.getY() + 1.0; // top of the block
-        if (loc.getY() > groundY) {
-            loc.setY(groundY);
-            player.teleport(loc);
-        }
-
-        // Optional: make it feel smooth
-        player.setVelocity(new Vector(player.getVelocity().getX(), 0, player.getVelocity().getZ()));
+        loc.getWorld().playSound(loc, Sound.BLOCK_GLASS_BREAK, 0.6f, 1.2f);
+        display.remove();
     }
-
-
 
     // release
     private void releaseBlast(Player caster) {
-
         runParticlesCommand("ppo " + caster.getName() + " remove dust_color_transition");
 
-        UUID id = caster.getUniqueId();
-
-        chargingPlayers.remove(id);
-
+        chargingPlayers.remove(caster.getUniqueId());
         caster.removePotionEffect(PotionEffectType.SLOWNESS);
 
-        double stored = storedDamage.remove(id);
+        shatterBubble(caster);
 
+        double stored = storedDamage.remove(caster.getUniqueId());
         double blastDamage = Math.min(stored * damageMultiplier, maxBlastDamage);
+
         Location center = caster.getLocation();
-
-        caster.sendMessage(Component.text("💥 Amethyst Overload!", NamedTextColor.DARK_PURPLE));
         center.getWorld().playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 2f, 0.9f);
-
-        center.getWorld().spawnParticle(
-                Particle.EXPLOSION_EMITTER,
-                center,
-                1
-        );
+        center.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, center, 1);
 
         for (LivingEntity target : center.getWorld().getLivingEntities()) {
             if (target.equals(caster)) continue;
             if (target.getLocation().distanceSquared(center) > blastRadius * blastRadius) continue;
 
-            // True damage (NO death spam)
             target.damage(0.1, caster);
             target.setHealth(Math.max(0, target.getHealth() - blastDamage));
-
-            double distance = target.getLocation().distance(center);
-            double scale = Math.max(0.2, 1.0 - (distance / blastRadius));
 
             Vector kb = target.getLocation().toVector()
                     .subtract(center.toVector())
                     .normalize()
-                    .multiply(0.5 * scale);
-
-            kb.setY(0.15 * scale);
+                    .multiply(0.5);
+            kb.setY(0.15);
             target.setVelocity(kb);
         }
     }
 
+    // cd
     private void runParticlesCommand(String command) {
-        if (!Bukkit.getPluginManager().isPluginEnabled("PlayerParticles")) return;
-        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+        if (Bukkit.getPluginManager().isPluginEnabled("PlayerParticles"))
+            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
     }
 
-    // cd
     private void startCooldownTimer(Player player, int seconds) {
         new BukkitRunnable() {
             int time = seconds;
 
             @Override
             public void run() {
-                if (time <= 0) {
+                if (time-- <= 0) {
                     player.sendActionBar(Component.text("✨ Amethyst ready!", NamedTextColor.LIGHT_PURPLE));
                     cancel();
-                    return;
+                } else {
+                    player.sendActionBar(Component.text("⏱ Amethyst Cooldown: " + time + "s", NamedTextColor.AQUA));
                 }
-                player.sendActionBar(Component.text("⏱ Amethyst Cooldown: " + time + "s", NamedTextColor.AQUA));
-                time--;
             }
         }.runTaskTimer(plugin, 0L, 20L);
     }
