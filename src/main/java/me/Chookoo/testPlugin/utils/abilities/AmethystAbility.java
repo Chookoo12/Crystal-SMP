@@ -15,8 +15,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.*;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.Transformation;
 import org.bukkit.util.Vector;
+import org.bukkit.util.Transformation;
 import org.joml.AxisAngle4f;
 import org.joml.Vector3f;
 
@@ -33,16 +33,15 @@ public class AmethystAbility implements CommandExecutor, Listener {
     private final int cooldownSeconds = 20;
     private final int chargeSeconds = 2;
     private final double storedDamagePercent = 0.60;
-    private final double damageMultiplier = 1.0;
+    private final double damageMultiplier = 1.2;
     private final double blastRadius = 3.5;
-    private final double maxBlastDamage = 14.0;
+    private final double maxBlastDamage = 10;
     private final double knockbackReduction = 0.35;
 
     // Bubble config
     private static final float BUBBLE_SIZE = 1.75f;
     private static final float BUBBLE_ROTATION_DEGREES = 45f;
 
-    // State
     private final Map<UUID, Double> storedDamage = new HashMap<>();
     private final Map<UUID, Long> chargingPlayers = new HashMap<>();
     private final Map<UUID, Display> amethystBubbles = new HashMap<>();
@@ -96,17 +95,45 @@ public class AmethystAbility implements CommandExecutor, Listener {
         return true;
     }
 
-    // damage
+    //damage / kb
     @EventHandler
     public void onDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
         if (!chargingPlayers.containsKey(player.getUniqueId())) return;
 
+        // Store damage
         double stored = event.getFinalDamage() * storedDamagePercent;
         storedDamage.put(player.getUniqueId(),
                 storedDamage.get(player.getUniqueId()) + stored);
 
-        player.setVelocity(player.getVelocity().multiply(knockbackReduction));
+        // Apply reduced knockback
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Vector v = player.getVelocity();
+            player.setVelocity(v.multiply(knockbackReduction));
+        });
+    }
+
+    //anti jump
+    @EventHandler
+    public void onPlayerMove(PlayerMoveEvent event) {
+        Player player = event.getPlayer();
+        if (!chargingPlayers.containsKey(player.getUniqueId())) return;
+
+        Location loc = player.getLocation();
+        Block below = loc.getBlock().getRelative(org.bukkit.block.BlockFace.DOWN);
+        if (!below.getType().isSolid()) return;
+
+        // Prevent jumping / vertical motion
+        Vector v = player.getVelocity();
+        v.setY(0);
+        player.setVelocity(v);
+
+        // Keep player grounded
+        double y = below.getY() + 1.0;
+        if (loc.getY() > y) {
+            loc.setY(y);
+            player.teleport(loc);
+        }
     }
 
     // item display
@@ -125,11 +152,9 @@ public class AmethystAbility implements CommandExecutor, Listener {
 
         ItemDisplay display = player.getWorld().spawn(loc, ItemDisplay.class);
 
-        // ⚠️ USE NON-CUBE TO SEE ROTATION
         ItemStack item = new ItemStack(Material.PURPLE_STAINED_GLASS);
         display.setItemStack(item);
 
-        // 🔥 REQUIRED FOR ROTATION TO APPLY CORRECTLY
         display.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
         display.setBillboard(Display.Billboard.FIXED);
 
@@ -145,7 +170,7 @@ public class AmethystAbility implements CommandExecutor, Listener {
                 new Vector3f(0f, 0f, 0f),
                 new AxisAngle4f(
                         (float) Math.toRadians(45),
-                        1f, 1f, 1f
+                        0f, 0f, 1f
                 ),
                 new Vector3f(scale, scale, scale),
                 new AxisAngle4f()
@@ -199,7 +224,7 @@ public class AmethystAbility implements CommandExecutor, Listener {
         display.remove();
     }
 
-    // release
+    // release blast
     private void releaseBlast(Player caster) {
         runParticlesCommand("ppo " + caster.getName() + " remove dust_color_transition");
 
@@ -219,8 +244,7 @@ public class AmethystAbility implements CommandExecutor, Listener {
             if (target.equals(caster)) continue;
             if (target.getLocation().distanceSquared(center) > blastRadius * blastRadius) continue;
 
-            target.damage(0.1, caster);
-            target.setHealth(Math.max(0, target.getHealth() - blastDamage));
+            target.damage(blastDamage, caster);
 
             Vector kb = target.getLocation().toVector()
                     .subtract(center.toVector())
@@ -231,7 +255,6 @@ public class AmethystAbility implements CommandExecutor, Listener {
         }
     }
 
-    // cd
     private void runParticlesCommand(String command) {
         if (Bukkit.getPluginManager().isPluginEnabled("PlayerParticles"))
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);

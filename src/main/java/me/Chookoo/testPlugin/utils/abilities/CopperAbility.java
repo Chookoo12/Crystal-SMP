@@ -17,6 +17,10 @@ import org.bukkit.util.Vector;
 
 public class CopperAbility implements CommandExecutor {
 
+    // Copper HUD icons (resource pack)
+    private static final String COPPER_READY_ICON = "\uE001";
+    private static final String COPPER_CD_ICON = "\uE002";
+
     private final JavaPlugin plugin;
     private final CooldownManager cooldownManager;
     private static final int COOLDOWN_TIME = 10;
@@ -43,8 +47,7 @@ public class CopperAbility implements CommandExecutor {
 
         startCooldownIndicator(
                 player,
-                cooldownManager.getPlayerCooldown(player.getUniqueId(), "copper"),
-                "Copper Ability"
+                cooldownManager.getPlayerCooldown(player.getUniqueId(), "copper")
         );
 
         PlayerInventory inv = player.getInventory();
@@ -241,20 +244,35 @@ public class CopperAbility implements CommandExecutor {
         return null;
     }
 
-    private void startCooldownIndicator(Player player, int cooldownSeconds, String abilityName) {
-        new BukkitRunnable() {
+    // Keep track of the active cooldown task to prevent multiple overlapping tasks
+    private BukkitRunnable cooldownTask;
+
+    private void startCooldownIndicator(Player player, int cooldownSeconds) {
+        // Show ready icon first
+        player.sendActionBar(Component.text(COPPER_READY_ICON + "\u2007ready!"));
+
+        // Cancel previous task if any
+        if (cooldownTask != null) cooldownTask.cancel();
+
+        cooldownTask = new BukkitRunnable() {
             int remaining = cooldownSeconds;
 
             @Override
             public void run() {
-                if (remaining <= 0) {
-                    player.sendActionBar(Component.text("✨ " + abilityName + " ready!", NamedTextColor.YELLOW));
+                if (remaining > 0) {
+                    // Pad single-digit numbers with a space for alignment
+                    String secondsText = (remaining < 10 ? " " : "") + remaining;
+                    // Figure space (\u2007) keeps text aligned vertically with icon
+                    player.sendActionBar(Component.text(COPPER_CD_ICON + "\u2007" + secondsText + "s"));
+                    remaining--;
+                } else {
+                    // Cooldown finished: show ready icon + text
+                    player.sendActionBar(Component.text(COPPER_READY_ICON + "\u2007ready!"));
                     cancel();
-                    return;
                 }
-                player.sendActionBar(Component.text("⏳ " + abilityName + " cooldown: " + remaining + "s", NamedTextColor.RED));
-                remaining--;
             }
-        }.runTaskTimer(plugin, 0L, 20L);
+        };
+
+        cooldownTask.runTaskTimer(plugin, 0L, 20L);
     }
 }
