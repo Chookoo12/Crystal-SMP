@@ -31,11 +31,11 @@ public class AmethystAbility implements CommandExecutor, Listener {
 
     // Adjustable parameters
     private final int cooldownSeconds = 20;
-    private final int chargeSeconds = 2;
+    private final int chargeSeconds = 5;
     private final double storedDamagePercent = 0.60;
-    private final double damageMultiplier = 1.2;
-    private final double blastRadius = 3.5;
-    private final double maxBlastDamage = 10;
+    private final double damageMultiplier = 1.0;
+    private final double blastRadius = 4;
+    private final double maxBlastDamage = 15;
     private final double knockbackReduction = 0.35;
 
     // Bubble config
@@ -71,8 +71,8 @@ public class AmethystAbility implements CommandExecutor, Listener {
 
         player.addPotionEffect(new PotionEffect(
                 PotionEffectType.SLOWNESS,
-                chargeSeconds * 20,
-                255,
+                chargeSeconds * 100,
+                2,
                 false,
                 false,
                 true

@@ -22,14 +22,18 @@ public class IronAbility implements Listener {
     private final JavaPlugin plugin;
     private final CooldownManager cooldownManager;
 
+    // icons (resource pack)
+    private static final String IRON_READY_ICON = "\uE003";
+    private static final String IRON_CD_ICON = "\uE004";
+
     private final Map<UUID, Integer> hitsLeft = new HashMap<>();
     private final Map<UUID, List<ArmorStand>> shields = new HashMap<>();
     private final Map<UUID, BukkitRunnable> shieldGlows = new HashMap<>();
     private final Map<UUID, PotionEffect> activeSlowness = new HashMap<>();
+    private final Map<UUID, BukkitRunnable> cooldownTasks = new HashMap<>();
 
     private final int cooldownTime = 30; // seconds
 
-    // Orbit settings
     private final double orbitRadius = 1.5;
     private final double[] heightOffsets = new double[]{0.5, 0.7, 0.9};
     private final double bobAmplitude = 0.2;
@@ -46,6 +50,7 @@ public class IronAbility implements Listener {
             player.sendMessage(Component.text("Ability is on cooldown!", NamedTextColor.RED));
             return;
         }
+        startCooldownIndicator(player, cooldownTime);
 
         if (hitsLeft.containsKey(player.getUniqueId())) {
             player.sendMessage(Component.text("Iron Shield already active!", NamedTextColor.RED));
@@ -62,7 +67,6 @@ public class IronAbility implements Listener {
 
         // Use action-bar cooldown instead of XP bar
         int remainingCooldown = cooldownManager.getPlayerCooldown(player.getUniqueId(), "iron");
-        startCooldownIndicator(player, remainingCooldown, "Iron Ability");
 
         startShieldGlow(player);
 
@@ -230,21 +234,53 @@ public class IronAbility implements Listener {
 
         player.sendMessage(Component.text("💥 Iron Shield shattered!", NamedTextColor.RED));
     }
+    private void startCooldownIndicator(Player player, int cooldownSeconds) {
 
-    private void startCooldownIndicator(Player player, int cooldownSeconds, String abilityName) {
-        new BukkitRunnable() {
+        UUID id = player.getUniqueId();
+
+        // Cancel any existing task for this player
+        if (cooldownTasks.containsKey(id)) {
+            cooldownTasks.get(id).cancel();
+            cooldownTasks.remove(id);
+        }
+
+        BukkitRunnable task = new BukkitRunnable() {
             int remaining = cooldownSeconds;
 
             @Override
             public void run() {
-                if (remaining <= 0) {
-                    player.sendActionBar(Component.text("✨ " + abilityName + " ready!", NamedTextColor.GRAY));
+
+                if (!player.isOnline()) {
                     cancel();
+                    cooldownTasks.remove(id);
                     return;
                 }
-                player.sendActionBar(Component.text("⏳ " + abilityName + " cooldown: " + remaining + "s", NamedTextColor.RED));
-                remaining--;
+
+                if (remaining > 0) {
+
+                    String secondsText = (remaining < 10 ? " " : "") + remaining;
+
+                    player.sendActionBar(
+                            Component.text(IRON_CD_ICON + "\u2007" + secondsText + "s")
+                    );
+
+                    remaining--;
+
+                } else {
+
+                    player.sendActionBar(
+                            Component.text(IRON_READY_ICON + "\u2007ready!")
+                    );
+
+                    cancel();
+                    cooldownTasks.remove(id); // <-- remove finished task
+                }
             }
-        }.runTaskTimer(plugin, 0L, 20L);
+        };
+
+        cooldownTasks.put(id, task);
+        task.runTaskTimer(plugin, 0L, 20L);
     }
+
+
 }

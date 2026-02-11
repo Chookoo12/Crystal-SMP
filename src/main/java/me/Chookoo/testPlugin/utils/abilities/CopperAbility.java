@@ -15,6 +15,10 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
 public class CopperAbility implements CommandExecutor {
 
     // Copper HUD icons (resource pack)
@@ -245,34 +249,54 @@ public class CopperAbility implements CommandExecutor {
     }
 
     // Keep track of the active cooldown task to prevent multiple overlapping tasks
-    private BukkitRunnable cooldownTask;
+    private final Map<UUID, BukkitRunnable> cooldownTasks = new HashMap<>();
 
     private void startCooldownIndicator(Player player, int cooldownSeconds) {
-        // Show ready icon first
-        player.sendActionBar(Component.text(COPPER_READY_ICON + "\u2007ready!"));
 
-        // Cancel previous task if any
-        if (cooldownTask != null) cooldownTask.cancel();
+        UUID id = player.getUniqueId();
 
-        cooldownTask = new BukkitRunnable() {
+        // Cancel any existing task for this player
+        if (cooldownTasks.containsKey(id)) {
+            cooldownTasks.get(id).cancel();
+            cooldownTasks.remove(id);
+        }
+
+        BukkitRunnable task = new BukkitRunnable() {
             int remaining = cooldownSeconds;
 
             @Override
             public void run() {
-                if (remaining > 0) {
-                    // Pad single-digit numbers with a space for alignment
-                    String secondsText = (remaining < 10 ? " " : "") + remaining;
-                    // Figure space (\u2007) keeps text aligned vertically with icon
-                    player.sendActionBar(Component.text(COPPER_CD_ICON + "\u2007" + secondsText + "s"));
-                    remaining--;
-                } else {
-                    // Cooldown finished: show ready icon + text
-                    player.sendActionBar(Component.text(COPPER_READY_ICON + "\u2007ready!"));
+
+                if (!player.isOnline()) {
                     cancel();
+                    cooldownTasks.remove(id);
+                    return;
+                }
+
+                if (remaining > 0) {
+
+                    String secondsText = (remaining < 10 ? " " : "") + remaining;
+
+                    player.sendActionBar(
+                            Component.text(COPPER_CD_ICON + "\u2007" + secondsText + "s")
+                    );
+
+                    remaining--;
+
+                } else {
+
+                    player.sendActionBar(
+                            Component.text(COPPER_READY_ICON + "\u2007ready!")
+                    );
+
+                    cancel();
+                    cooldownTasks.remove(id); // remove finished task
                 }
             }
         };
 
-        cooldownTask.runTaskTimer(plugin, 0L, 20L);
+        cooldownTasks.put(id, task);
+        task.runTaskTimer(plugin, 0L, 20L);
     }
+
 }

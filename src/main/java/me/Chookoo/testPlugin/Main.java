@@ -1,5 +1,6 @@
 package me.Chookoo.testPlugin;
 
+import me.Chookoo.testPlugin.utils.AbilityHUD;
 import me.Chookoo.testPlugin.utils.CooldownManager;
 import me.Chookoo.testPlugin.utils.abilities.AbilityCommandExecutor;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -7,14 +8,16 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class Main extends JavaPlugin {
 
     private CooldownManager cooldownManager;
+    private AbilityHUD abilityHUD;
 
     @Override
     public void onEnable() {
 
-        // Managers
         cooldownManager = new CooldownManager();
 
-        // Register commands
+        // STORE HUD INSTANCE
+        abilityHUD = new AbilityHUD(this, cooldownManager);
+
         if (getCommand("ability") != null) {
             getCommand("ability").setExecutor(
                     new AbilityCommandExecutor(this, cooldownManager)
@@ -24,9 +27,8 @@ public final class Main extends JavaPlugin {
         getLogger().info("Plugin enabled successfully!");
     }
 
-    @Override
-    public void onDisable() {
-        getLogger().info("Plugin disabled.");
+    public AbilityHUD getAbilityHUD() {
+        return abilityHUD;
     }
 
     public CooldownManager getCooldownManager() {
