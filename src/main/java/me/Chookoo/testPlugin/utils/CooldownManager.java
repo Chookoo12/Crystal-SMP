@@ -2,6 +2,7 @@ package me.Chookoo.testPlugin.utils;
 
 import org.bukkit.entity.Player;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -35,6 +36,12 @@ public class CooldownManager {
 
         long remaining = time - System.currentTimeMillis();
         return (int) Math.max(0, remaining / 1000);
+    }
+
+    public Map<String, Long> getCooldowns(UUID player) {
+        Map<String, Long> map = cooldowns.get(player);
+        if (map == null) return Collections.emptyMap();
+        return new HashMap<>(map); // prevent modification
     }
 
 

@@ -1,5 +1,6 @@
 package me.Chookoo.testPlugin.utils.abilities;
 
+import me.Chookoo.testPlugin.Main;
 import me.Chookoo.testPlugin.utils.CooldownManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -14,8 +15,20 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.Vector;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.*;
+import org.bukkit.entity.*;
+import org.bukkit.event.Listener;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import java.util.*;
+
 
 public class IronAbility implements Listener {
 
@@ -26,11 +39,11 @@ public class IronAbility implements Listener {
     private static final String IRON_READY_ICON = "\uE003";
     private static final String IRON_CD_ICON = "\uE004";
 
+    // Maps for active shields and cooldown tasks
     private final Map<UUID, Integer> hitsLeft = new HashMap<>();
     private final Map<UUID, List<ArmorStand>> shields = new HashMap<>();
     private final Map<UUID, BukkitRunnable> shieldGlows = new HashMap<>();
     private final Map<UUID, PotionEffect> activeSlowness = new HashMap<>();
-    private final Map<UUID, BukkitRunnable> cooldownTasks = new HashMap<>();
 
     private final int cooldownTime = 30; // seconds
 
@@ -50,7 +63,7 @@ public class IronAbility implements Listener {
             player.sendMessage(Component.text("Ability is on cooldown!", NamedTextColor.RED));
             return;
         }
-        startCooldownIndicator(player, cooldownTime);
+
 
         if (hitsLeft.containsKey(player.getUniqueId())) {
             player.sendMessage(Component.text("Iron Shield already active!", NamedTextColor.RED));
@@ -64,10 +77,6 @@ public class IronAbility implements Listener {
         activeSlowness.put(player.getUniqueId(), slowness);
 
         spawnShields(player);
-
-        // Use action-bar cooldown instead of XP bar
-        int remainingCooldown = cooldownManager.getPlayerCooldown(player.getUniqueId(), "iron");
-
         startShieldGlow(player);
 
         player.sendMessage(Component.text("🛡 Iron Shield activated!", NamedTextColor.GRAY));
@@ -234,53 +243,4 @@ public class IronAbility implements Listener {
 
         player.sendMessage(Component.text("💥 Iron Shield shattered!", NamedTextColor.RED));
     }
-    private void startCooldownIndicator(Player player, int cooldownSeconds) {
-
-        UUID id = player.getUniqueId();
-
-        // Cancel any existing task for this player
-        if (cooldownTasks.containsKey(id)) {
-            cooldownTasks.get(id).cancel();
-            cooldownTasks.remove(id);
-        }
-
-        BukkitRunnable task = new BukkitRunnable() {
-            int remaining = cooldownSeconds;
-
-            @Override
-            public void run() {
-
-                if (!player.isOnline()) {
-                    cancel();
-                    cooldownTasks.remove(id);
-                    return;
-                }
-
-                if (remaining > 0) {
-
-                    String secondsText = (remaining < 10 ? " " : "") + remaining;
-
-                    player.sendActionBar(
-                            Component.text(IRON_CD_ICON + "\u2007" + secondsText + "s")
-                    );
-
-                    remaining--;
-
-                } else {
-
-                    player.sendActionBar(
-                            Component.text(IRON_READY_ICON + "\u2007ready!")
-                    );
-
-                    cancel();
-                    cooldownTasks.remove(id); // <-- remove finished task
-                }
-            }
-        };
-
-        cooldownTasks.put(id, task);
-        task.runTaskTimer(plugin, 0L, 20L);
-    }
-
-
 }

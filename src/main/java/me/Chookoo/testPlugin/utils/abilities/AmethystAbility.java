@@ -70,9 +70,9 @@ public class AmethystAbility implements CommandExecutor, Listener {
         chargingPlayers.put(id, System.currentTimeMillis() + (chargeSeconds * 1000L));
 
         player.addPotionEffect(new PotionEffect(
-                PotionEffectType.SLOWNESS,
+                PotionEffectType.RESISTANCE,
                 chargeSeconds * 100,
-                2,
+                1,
                 false,
                 false,
                 true
@@ -111,29 +111,6 @@ public class AmethystAbility implements CommandExecutor, Listener {
             Vector v = player.getVelocity();
             player.setVelocity(v.multiply(knockbackReduction));
         });
-    }
-
-    //anti jump
-    @EventHandler
-    public void onPlayerMove(PlayerMoveEvent event) {
-        Player player = event.getPlayer();
-        if (!chargingPlayers.containsKey(player.getUniqueId())) return;
-
-        Location loc = player.getLocation();
-        Block below = loc.getBlock().getRelative(org.bukkit.block.BlockFace.DOWN);
-        if (!below.getType().isSolid()) return;
-
-        // Prevent jumping / vertical motion
-        Vector v = player.getVelocity();
-        v.setY(0);
-        player.setVelocity(v);
-
-        // Keep player grounded
-        double y = below.getY() + 1.0;
-        if (loc.getY() > y) {
-            loc.setY(y);
-            player.teleport(loc);
-        }
     }
 
     // item display
@@ -228,24 +205,35 @@ public class AmethystAbility implements CommandExecutor, Listener {
     private void releaseBlast(Player caster) {
         runParticlesCommand("ppo " + caster.getName() + " remove dust_color_transition");
 
-        chargingPlayers.remove(caster.getUniqueId());
-        caster.removePotionEffect(PotionEffectType.SLOWNESS);
+        UUID id = caster.getUniqueId();
+        chargingPlayers.remove(id);
+        caster.removePotionEffect(PotionEffectType.RESISTANCE);
 
         shatterBubble(caster);
 
-        double stored = storedDamage.remove(caster.getUniqueId());
+        double stored = storedDamage.remove(id);
         double blastDamage = Math.min(stored * damageMultiplier, maxBlastDamage);
 
         Location center = caster.getLocation();
-        center.getWorld().playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 2f, 0.9f);
-        center.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, center, 1);
+        World world = center.getWorld();
 
-        for (LivingEntity target : center.getWorld().getLivingEntities()) {
+        // Explosion visuals and sound
+        world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 2f, 0.9f);
+        world.spawnParticle(Particle.EXPLOSION_EMITTER, center, 1);
+
+        for (LivingEntity target : world.getLivingEntities()) {
             if (target.equals(caster)) continue;
             if (target.getLocation().distanceSquared(center) > blastRadius * blastRadius) continue;
 
-            target.damage(blastDamage, caster);
+            // === Tick damage for animation/effects ===
+            target.setNoDamageTicks(0);
+            target.damage(0.1);
 
+            // === True damage applied separately ===
+            double trueDamage = blastDamage;
+            target.setHealth(Math.max(0, target.getHealth() - trueDamage));
+
+            // Knockback
             Vector kb = target.getLocation().toVector()
                     .subtract(center.toVector())
                     .normalize()

@@ -6,105 +6,134 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 public class AbilityHUD {
 
     private final JavaPlugin plugin;
-    private final CooldownManager cooldownManager;
+    private final CooldownManager cooldowns;
 
-    private static final String COPPER_READY = "\uE001";
-    private static final String COPPER_CD = "\uE002";
+    private final Map<UUID, Map<String, Integer>> fadeMap = new HashMap<>();
+    private final Map<UUID, String> lastBar = new HashMap<>();
 
-    private static final String IRON_READY = "\uE003";
-    private static final String IRON_CD = "\uE004";
+    private static final int FADE_TIME = 40;
+    private static final String PX = "\uE101";
 
-    private static final String GAP = "\u2007";
-
-    // Tracks which ability is currently being displayed per player
-    private final Map<UUID, String> activeAbility = new HashMap<>();
-
-    // Prevents jitter
-    private final Map<UUID, String> lastMessage = new HashMap<>();
-
-    public AbilityHUD(JavaPlugin plugin, CooldownManager cooldownManager) {
+    public AbilityHUD(JavaPlugin plugin, CooldownManager cooldowns) {
         this.plugin = plugin;
-        this.cooldownManager = cooldownManager;
+        this.cooldowns = cooldowns;
         start();
-    }
-
-    // Called by abilities when used
-    public void trackAbility(Player player, String abilityKey) {
-        activeAbility.put(player.getUniqueId(), abilityKey);
     }
 
     private void start() {
         new BukkitRunnable() {
             @Override
             public void run() {
-                for (Player player : Bukkit.getOnlinePlayers()) {
-                    render(player);
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    render(p);
                 }
             }
-        }.runTaskTimer(plugin, 0L, 20L); // once per second (stable)
+        }.runTaskTimer(plugin, 0L, 2L);
+    }
+
+    public void markAbilityUsed(Player player, String ability) {
+        UUID id = player.getUniqueId();
+        fadeMap.computeIfAbsent(id, k -> new HashMap<>()).put(ability, 0);
     }
 
     private void render(Player player) {
-
         UUID id = player.getUniqueId();
-        String abilityKey = activeAbility.get(id);
+        Map<String, Integer> playerFades = fadeMap.get(id);
 
-        if (abilityKey == null) {
+        if (playerFades == null || playerFades.isEmpty()) {
             clear(player);
             return;
         }
 
-        int remaining = cooldownManager.getPlayerCooldown(id, abilityKey);
+        StringBuilder leftBar = new StringBuilder();
+        StringBuilder centerBar = new StringBuilder();
 
-        String message;
+        List<String> toRemove = new ArrayList<>();
 
-        if (abilityKey.equals("copper")) {
-            message = buildMessage(remaining, COPPER_READY, COPPER_CD);
-        } else if (abilityKey.equals("iron")) {
-            message = buildMessage(remaining, IRON_READY, IRON_CD);
+        // Stable order (iron first)
+        List<String> abilities = new ArrayList<>(playerFades.keySet());
+        abilities.sort((a, b) -> a.equals("iron") ? -1 : b.equals("iron") ? 1 : a.compareTo(b));
+
+        // Detect if multiple abilities are fading
+        boolean multiple = abilities.size() > 1;
+
+        for (String ability : abilities) {
+
+            int fade = playerFades.getOrDefault(ability, 0);
+            int seconds = cooldowns.getPlayerCooldown(id, ability);
+            boolean ready = seconds <= 0;
+
+            // ===== GROUP FADE LOGIC =====
+            if (ready) {
+                fade++;
+
+                // If multiple abilities exist, clamp removal until ALL finished
+                if (!multiple && fade > FADE_TIME) {
+                    toRemove.add(ability);
+                    continue;
+                }
+
+                playerFades.put(ability, fade);
+            }
+
+            String icon = icon(ability, ready);
+            String text = ready ? "ready " : seconds + "s ";
+
+            String part;
+
+            // LEFT SIDE: text before icon
+            if (ability.equals("iron")) {
+                part = text + PX + icon + PX + PX;
+                leftBar.append(part);
+            }
+            // CENTER: icon before text
+            else {
+                part = icon + PX + text + PX + PX;
+                centerBar.append(part);
+            }
+        }
+
+        // After rendering — synchronized removal
+        if (multiple) {
+            boolean allFinished = true;
+            for (int f : playerFades.values())
+                if (f <= FADE_TIME) allFinished = false;
+
+            if (allFinished) {
+                playerFades.clear();
+            }
         } else {
-            return;
+            for (String remove : toRemove)
+                playerFades.remove(remove);
         }
 
-        send(player, message);
+        String finalBar = leftBar.toString() + centerBar.toString();
 
-        // Remove once ready message has shown
-        if (remaining <= 0) {
-            activeAbility.remove(id);
+        if (!finalBar.equals(lastBar.get(id))) {
+            lastBar.put(id, finalBar);
+            player.sendActionBar(Component.text(finalBar));
+        }
+
+        if (playerFades.isEmpty()) {
+            fadeMap.remove(id);
         }
     }
 
-    private String buildMessage(int remaining, String readyIcon, String cdIcon) {
-
-        if (remaining > 0) {
-            return cdIcon + GAP +
-                    (remaining < 10 ? " " : "") +
-                    remaining + "s";
-        }
-
-        return readyIcon + GAP + "ready!";
-    }
-
-    private void send(Player player, String message) {
-
-        UUID id = player.getUniqueId();
-
-        if (message.equals(lastMessage.get(id))) return;
-
-        lastMessage.put(id, message);
-        player.sendActionBar(Component.text(message));
+    private String icon(String ability, boolean ready) {
+        return switch (ability) {
+            case "copper" -> ready ? "\uE001" : "\uE002";
+            case "iron" -> ready ? "\uE003" : "\uE004";
+            default -> "?";
+        };
     }
 
     private void clear(Player player) {
-        UUID id = player.getUniqueId();
-        lastMessage.remove(id);
+        lastBar.remove(player.getUniqueId());
         player.sendActionBar(Component.text(""));
     }
 }

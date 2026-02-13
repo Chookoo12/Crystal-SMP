@@ -1,5 +1,6 @@
 package me.Chookoo.testPlugin.utils.abilities;
 
+import me.Chookoo.testPlugin.Main;
 import me.Chookoo.testPlugin.utils.CooldownManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -49,10 +50,6 @@ public class CopperAbility implements CommandExecutor {
 
         if (!cooldownManager.tryUseAbility(player, 0, COOLDOWN_TIME, COOLDOWN_TIME, "copper")) return true;
 
-        startCooldownIndicator(
-                player,
-                cooldownManager.getPlayerCooldown(player.getUniqueId(), "copper")
-        );
 
         PlayerInventory inv = player.getInventory();
         boolean copperHelmet =
@@ -247,56 +244,4 @@ public class CopperAbility implements CommandExecutor {
         }
         return null;
     }
-
-    // Keep track of the active cooldown task to prevent multiple overlapping tasks
-    private final Map<UUID, BukkitRunnable> cooldownTasks = new HashMap<>();
-
-    private void startCooldownIndicator(Player player, int cooldownSeconds) {
-
-        UUID id = player.getUniqueId();
-
-        // Cancel any existing task for this player
-        if (cooldownTasks.containsKey(id)) {
-            cooldownTasks.get(id).cancel();
-            cooldownTasks.remove(id);
-        }
-
-        BukkitRunnable task = new BukkitRunnable() {
-            int remaining = cooldownSeconds;
-
-            @Override
-            public void run() {
-
-                if (!player.isOnline()) {
-                    cancel();
-                    cooldownTasks.remove(id);
-                    return;
-                }
-
-                if (remaining > 0) {
-
-                    String secondsText = (remaining < 10 ? " " : "") + remaining;
-
-                    player.sendActionBar(
-                            Component.text(COPPER_CD_ICON + "\u2007" + secondsText + "s")
-                    );
-
-                    remaining--;
-
-                } else {
-
-                    player.sendActionBar(
-                            Component.text(COPPER_READY_ICON + "\u2007ready!")
-                    );
-
-                    cancel();
-                    cooldownTasks.remove(id); // remove finished task
-                }
-            }
-        };
-
-        cooldownTasks.put(id, task);
-        task.runTaskTimer(plugin, 0L, 20L);
-    }
-
 }

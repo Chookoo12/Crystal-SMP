@@ -14,15 +14,18 @@ public final class Main extends JavaPlugin {
     public void onEnable() {
 
         cooldownManager = new CooldownManager();
-
-        // STORE HUD INSTANCE
         abilityHUD = new AbilityHUD(this, cooldownManager);
 
         if (getCommand("ability") != null) {
             getCommand("ability").setExecutor(
-                    new AbilityCommandExecutor(this, cooldownManager)
+                    new AbilityCommandExecutor(this, cooldownManager, abilityHUD)
             );
         }
+
+        getCommand("ability").setExecutor(
+                new AbilityCommandExecutor(this, cooldownManager, abilityHUD)
+        );
+
 
         getLogger().info("Plugin enabled successfully!");
     }
