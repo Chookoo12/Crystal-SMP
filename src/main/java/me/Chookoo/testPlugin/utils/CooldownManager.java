@@ -27,6 +27,14 @@ public class CooldownManager {
         playerCooldowns.put(ability, millis);
     }
 
+    public long getCooldownEnd(UUID player, String ability) {
+        Map<String, Long> playerCooldowns = cooldowns.get(player);
+        if (playerCooldowns == null) return 0L;
+
+        return playerCooldowns.getOrDefault(ability, 0L);
+    }
+
+
     public int getPlayerCooldown(UUID player, String ability) {
         Map<String, Long> playerCooldowns = cooldowns.get(player);
         if (playerCooldowns == null) return 0;

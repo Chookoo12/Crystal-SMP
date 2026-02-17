@@ -1,6 +1,8 @@
 package me.Chookoo.testPlugin.utils.abilities;
 
 import me.Chookoo.testPlugin.utils.CooldownManager;
+import me.Chookoo.testPlugin.utils.roll.OreType;
+import me.Chookoo.testPlugin.utils.roll.PlayerClassManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -33,12 +35,17 @@ public class EmeraldAbility implements CommandExecutor {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) return true;
 
-        if (args.length != 2 || !args[0].equalsIgnoreCase("emerald") || !args[1].equals("1")) {
+        if (args.length != 2 || !args[0].equalsIgnoreCase("emerald_primary") || !args[1].equals("1")) {
             player.sendMessage(Component.text("Usage: /ability emerald 1", NamedTextColor.YELLOW));
             return true;
         }
 
-        if (!cooldownManager.tryUseAbilityCooldownOnly(player, cooldownTime, cooldownTime, "emerald"))
+        if (PlayerClassManager.getClass(player.getUniqueId()) != OreType.EMERALD) {
+            player.sendMessage(Component.text("You are not an Emerald user!", NamedTextColor.RED));
+            return true;
+        }
+
+        if (!cooldownManager.tryUseAbilityCooldownOnly(player, cooldownTime, cooldownTime, "emerald_primary"))
             return true;
 
         startCooldownTimer(player, cooldownTime);
@@ -53,7 +60,7 @@ public class EmeraldAbility implements CommandExecutor {
         int fangsPerRow = 4;
         int totalRows = 4;            // horizontal rows
         double rowSpacing = 1.0;
-        double trueDamage = 0.3;
+        double trueDamage = 0.15;
         long fangLifetime = 25L;
         // --------------------------------
 

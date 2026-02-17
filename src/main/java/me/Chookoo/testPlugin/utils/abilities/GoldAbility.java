@@ -1,6 +1,8 @@
 package me.Chookoo.testPlugin.utils.abilities;
 
 import me.Chookoo.testPlugin.utils.CooldownManager;
+import me.Chookoo.testPlugin.utils.roll.OreType;
+import me.Chookoo.testPlugin.utils.roll.PlayerClassManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -86,16 +88,18 @@ public class GoldAbility implements CommandExecutor, Listener {
             return true;
         }
 
-        // cd
-        if (!cooldownManager.tryUseAbility(player, COOLDOWN_TIME, COOLDOWN_TIME, COOLDOWN_TIME, "gold")) {
-            int remaining = cooldownManager.getPlayerCooldown(player.getUniqueId(), "gold");
+        if (PlayerClassManager.getClass(player.getUniqueId()) != OreType.GOLD) {
+            player.sendMessage(Component.text("You are not an Gold user!", NamedTextColor.RED));
+            return true;
+        }
+
+        if (!cooldownManager.tryUseAbilityCooldownOnly(player, COOLDOWN_TIME, COOLDOWN_TIME, "gold_primary")) {
+            int remaining = cooldownManager.getPlayerCooldown(player.getUniqueId(), "gold_primary");
             player.sendActionBar(Component.text("⏳ Gold Ability cooldown: " + remaining + "s", NamedTextColor.RED));
             return true;
         }
 
-        // Start action-bar cooldown indicator
-        int remaining = cooldownManager.getPlayerCooldown(player.getUniqueId(), "gold");
-        startCooldownIndicator(player, remaining, "Gold Ability");
+        int remaining = cooldownManager.getPlayerCooldown(player.getUniqueId(), "gold_primary");
 
         // Run slot machine as normal
         SlotSymbol finalSymbol = randomSymbol();

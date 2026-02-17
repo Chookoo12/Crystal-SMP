@@ -1,7 +1,5 @@
 package me.Chookoo.testPlugin.utils.abilities;
 
-import me.Chookoo.testPlugin.utils.AbilityHUD;
-import me.Chookoo.testPlugin.utils.CooldownManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.Command;
@@ -14,52 +12,58 @@ public class AbilityCommandExecutor implements CommandExecutor {
 
     private final CopperAbility copperAbility;
     private final IronAbility ironAbility;
-    private final AbilityHUD abilityHUD;
-    private final CooldownManager cooldownManager;
+    private final GoldAbility goldAbility;
+    private final RedstoneAbility redstoneAbility;
+    private final LapisAbility lapisAbility;
+    private final EmeraldAbility emeraldAbility;
+    private final AmethystAbility amethystAbility;
 
-    public AbilityCommandExecutor(JavaPlugin plugin, CooldownManager cooldownManager, AbilityHUD abilityHUD) {
+    public AbilityCommandExecutor(JavaPlugin plugin, me.Chookoo.testPlugin.utils.CooldownManager cooldownManager) {
+
+        // Create ability instances
         this.copperAbility = new CopperAbility(plugin, cooldownManager);
         this.ironAbility = new IronAbility(plugin, cooldownManager);
-        this.cooldownManager = cooldownManager;
-        this.abilityHUD = abilityHUD;
+        this.goldAbility = new GoldAbility(plugin, cooldownManager);
+        this.redstoneAbility = new RedstoneAbility(plugin, cooldownManager);
+        this.lapisAbility = new LapisAbility(plugin, cooldownManager);
+        this.emeraldAbility = new EmeraldAbility(plugin, cooldownManager);
+        this.amethystAbility = new AmethystAbility(plugin, cooldownManager);
 
-        // Register Iron listener
+        // Register listeners (abilities that need events)
         plugin.getServer().getPluginManager().registerEvents(ironAbility, plugin);
+        plugin.getServer().getPluginManager().registerEvents(amethystAbility, plugin);
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+
         if (!(sender instanceof Player player)) {
             sender.sendMessage(Component.text("Only players can use this command.", NamedTextColor.YELLOW));
             return true;
         }
 
         if (args.length < 2) {
-            player.sendMessage(Component.text("Usage: /ability <copper|iron> <level>", NamedTextColor.YELLOW));
+            player.sendMessage(Component.text(
+                    "Usage: /ability <copper|iron|gold|redstone|lapis|emerald|amethyst> <level>",
+                    NamedTextColor.YELLOW
+            ));
             return true;
         }
 
         String abilityName = args[0].toLowerCase();
 
         switch (abilityName) {
-            case "copper" -> {
-                copperAbility.onCommand(sender, command, label, args);
-
-                // Only mark for HUD if it's on cooldown
-                if (cooldownManager.getPlayerCooldown(player.getUniqueId(), "copper") > 0) {
-                    abilityHUD.markAbilityUsed(player, "copper");
-                }
-            }
-            case "iron" -> {
-                ironAbility.activate(player);
-
-                if (cooldownManager.getPlayerCooldown(player.getUniqueId(), "iron") > 0) {
-                    abilityHUD.markAbilityUsed(player, "iron");
-                }
-            }
-            default -> player.sendMessage(
-                    Component.text("Unknown ability. Use: copper, iron", NamedTextColor.RED)
-            );
+            case "copper" -> copperAbility.onCommand(sender, command, label, args);
+            case "iron" -> ironAbility.activate(player);
+            case "gold" -> goldAbility.onCommand(sender, command, label, args);
+            case "redstone" -> redstoneAbility.onCommand(sender, command, label, args);
+            case "lapis" -> lapisAbility.onCommand(sender, command, label, args);
+            case "emerald" -> emeraldAbility.onCommand(sender, command, label, args);
+            case "amethyst" -> amethystAbility.onCommand(sender, command, label, args);
+            default -> player.sendMessage(Component.text(
+                    "Unknown ability. Use: copper, iron, gold, redstone, lapis, emerald, or amethyst.",
+                    NamedTextColor.RED
+            ));
         }
 
         return true;

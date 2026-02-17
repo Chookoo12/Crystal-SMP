@@ -2,6 +2,8 @@ package me.Chookoo.testPlugin.utils.abilities;
 
 import me.Chookoo.testPlugin.Main;
 import me.Chookoo.testPlugin.utils.CooldownManager;
+import me.Chookoo.testPlugin.utils.roll.OreType;
+import me.Chookoo.testPlugin.utils.roll.PlayerClassManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -43,12 +45,18 @@ public class CopperAbility implements CommandExecutor {
             return true;
         }
 
-        if (args.length != 2 || !args[0].equalsIgnoreCase("copper") || !args[1].equals("1")) {
+
+        if (PlayerClassManager.getClass(player.getUniqueId()) != OreType.COPPER) {
+            player.sendMessage(Component.text("You are not an Copper user!", NamedTextColor.RED));
+            return true;
+        }
+
+        if (args.length != 2 || !args[0].equalsIgnoreCase("copper_primary") || !args[1].equals("1")) {
             player.sendMessage(Component.text("Usage: /ability copper 1", NamedTextColor.YELLOW));
             return true;
         }
 
-        if (!cooldownManager.tryUseAbility(player, 0, COOLDOWN_TIME, COOLDOWN_TIME, "copper")) return true;
+        if (!cooldownManager.tryUseAbility(player, 0, COOLDOWN_TIME, COOLDOWN_TIME, "copper_primary")) return true;
 
 
         PlayerInventory inv = player.getInventory();

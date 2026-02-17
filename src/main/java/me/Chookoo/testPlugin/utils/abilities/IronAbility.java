@@ -2,6 +2,8 @@ package me.Chookoo.testPlugin.utils.abilities;
 
 import me.Chookoo.testPlugin.Main;
 import me.Chookoo.testPlugin.utils.CooldownManager;
+import me.Chookoo.testPlugin.utils.roll.OreType;
+import me.Chookoo.testPlugin.utils.roll.PlayerClassManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -58,12 +60,16 @@ public class IronAbility implements Listener {
     }
 
     public void activate(Player player) {
-        // Use cooldown-only method, no XP cost
-        if (!cooldownManager.tryUseAbilityCooldownOnly(player, cooldownTime, cooldownTime, "iron")) {
-            player.sendMessage(Component.text("Ability is on cooldown!", NamedTextColor.RED));
+
+        if (PlayerClassManager.getClass(player.getUniqueId()) != OreType.IRON) {
+            player.sendMessage(Component.text("You are not an Iron user!", NamedTextColor.RED));
             return;
         }
 
+        if (!cooldownManager.tryUseAbilityCooldownOnly(player, cooldownTime, cooldownTime, "iron_primary")) {
+            player.sendMessage(Component.text("Ability is on cooldown!", NamedTextColor.RED));
+            return;
+        }
 
         if (hitsLeft.containsKey(player.getUniqueId())) {
             player.sendMessage(Component.text("Iron Shield already active!", NamedTextColor.RED));

@@ -1,6 +1,8 @@
 package me.Chookoo.testPlugin.utils.abilities;
 
 import me.Chookoo.testPlugin.utils.CooldownManager;
+import me.Chookoo.testPlugin.utils.roll.OreType;
+import me.Chookoo.testPlugin.utils.roll.PlayerClassManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -38,12 +40,17 @@ public class LapisAbility implements CommandExecutor {
             return true;
         }
 
-        if (args.length != 2 || !args[0].equalsIgnoreCase("lapis") || !args[1].equals("1")) {
+        if (PlayerClassManager.getClass(player.getUniqueId()) != OreType.LAPIS) {
+            player.sendMessage(Component.text("You are not an Lapis user!", NamedTextColor.RED));
+            return true;
+        }
+
+        if (args.length != 2 || !args[0].equalsIgnoreCase("lapis_primary") || !args[1].equals("1")) {
             player.sendMessage(Component.text("Usage: /ability lapis 1", NamedTextColor.YELLOW));
             return true;
         }
 
-        if (!cooldownManager.tryUseAbility(player, 0, COOLDOWN_TIME, COOLDOWN_TIME, "lapis"))
+        if (!cooldownManager.tryUseAbility(player, 0, COOLDOWN_TIME, COOLDOWN_TIME, "lapis_primary"))
             return true;
 
         int remainingCooldown = cooldownManager.getPlayerCooldown(player.getUniqueId(), "lapis");

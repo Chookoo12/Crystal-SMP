@@ -1,6 +1,8 @@
 package me.Chookoo.testPlugin.utils.abilities;
 
 import me.Chookoo.testPlugin.utils.CooldownManager;
+import me.Chookoo.testPlugin.utils.roll.OreType;
+import me.Chookoo.testPlugin.utils.roll.PlayerClassManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -31,9 +33,9 @@ public class AmethystAbility implements CommandExecutor, Listener {
 
     // Adjustable parameters
     private final int cooldownSeconds = 20;
-    private final int chargeSeconds = 5;
-    private final double storedDamagePercent = 0.60;
-    private final double damageMultiplier = 1.0;
+    private final int chargeSeconds = 4;
+    private final double storedDamagePercent = 1;
+    private final double damageMultiplier = 1.4;
     private final double blastRadius = 4;
     private final double maxBlastDamage = 15;
     private final double knockbackReduction = 0.35;
@@ -55,6 +57,7 @@ public class AmethystAbility implements CommandExecutor, Listener {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+
         if (!(sender instanceof Player player)) return true;
 
         if (args.length != 2 || !args[0].equalsIgnoreCase("amethyst") || !args[1].equals("1")) {
@@ -62,8 +65,15 @@ public class AmethystAbility implements CommandExecutor, Listener {
             return true;
         }
 
-        if (!cooldownManager.tryUseAbilityCooldownOnly(player, cooldownSeconds, cooldownSeconds, "amethyst"))
+        if (PlayerClassManager.getClass(player.getUniqueId()) != OreType.AMETHYST) {
+            player.sendMessage(Component.text("You are not an Amethyst user!", NamedTextColor.RED));
             return true;
+        }
+
+        if (!cooldownManager.tryUseAbilityCooldownOnly(player, cooldownSeconds, cooldownSeconds, "amethyst_primary")) {
+            player.sendMessage(Component.text("Ability is on cooldown!", NamedTextColor.RED));
+            return true;
+        }
 
         UUID id = player.getUniqueId();
         storedDamage.put(id, 0.0);
@@ -94,6 +104,7 @@ public class AmethystAbility implements CommandExecutor, Listener {
 
         return true;
     }
+
 
     //damage / kb
     @EventHandler
@@ -211,7 +222,9 @@ public class AmethystAbility implements CommandExecutor, Listener {
 
         shatterBubble(caster);
 
-        double stored = storedDamage.remove(id);
+        double stored = storedDamage.getOrDefault(id, 0.0);
+        storedDamage.remove(id);
+
         double blastDamage = Math.min(stored * damageMultiplier, maxBlastDamage);
 
         Location center = caster.getLocation();

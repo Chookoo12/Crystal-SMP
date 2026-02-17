@@ -5,4 +5,9 @@ api-version: 1.21
 commands:
   ability:
     description: Use your abilities
-    usage: /ability <copper|gold|iron|lapis|redstone|emerald|amethyst> <level>
+    usage: /ability <copper|gold|iron|lapis|redstone|emerald|amethyst>
+  roll:
+    description: Roll a player's ability class
+    usage: /roll <player|@e|@s>
+    permission: op
+    permission-message: You must be OP to use this command

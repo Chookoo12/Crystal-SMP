@@ -1,6 +1,8 @@
 package me.Chookoo.testPlugin.utils.abilities;
 
 import me.Chookoo.testPlugin.utils.CooldownManager;
+import me.Chookoo.testPlugin.utils.roll.OreType;
+import me.Chookoo.testPlugin.utils.roll.PlayerClassManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -42,15 +44,20 @@ public class RedstoneAbility implements CommandExecutor {
             return true;
         }
 
-        if (args.length != 2 || !args[0].equalsIgnoreCase("redstone") || !args[1].equals("1")) {
+        if (PlayerClassManager.getClass(player.getUniqueId()) != OreType.REDSTONE) {
+            player.sendMessage(Component.text("You are not an Redstone user!", NamedTextColor.RED));
+            return true;
+        }
+
+        if (args.length != 2 || !args[0].equalsIgnoreCase("redstone_primary") || !args[1].equals("1")) {
             player.sendMessage(Component.text("Usage: /ability redstone 1", NamedTextColor.YELLOW));
             return true;
         }
 
-        if (!cooldownManager.tryUseAbilityCooldownOnly(player, cooldownTime, cooldownTime, "redstone"))
+        if (!cooldownManager.tryUseAbilityCooldownOnly(player, cooldownTime, cooldownTime, "redstone_primary"))
             return true;
 
-        int remaining = cooldownManager.getPlayerCooldown(player.getUniqueId(), "redstone");
+        int remaining = cooldownManager.getPlayerCooldown(player.getUniqueId(), "redstone_primary");
         startCooldownTimer(player, remaining);
 
         player.sendMessage(Component.text("🔴 Charging Redstone Overload...", NamedTextColor.RED));

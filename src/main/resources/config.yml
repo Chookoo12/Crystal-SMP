@@ -1,0 +1,3 @@
+roll:
+  cycles: 15  # how many times the roll animation cycles
+  speed: 2     # delay in ticks between each roll step
